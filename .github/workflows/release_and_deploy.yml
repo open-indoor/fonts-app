@@ -1,9 +1,9 @@
-name: Build new image and Deploy it to Kubernetes
+name: Build release image and Deploy it to Kubernetes
 
 on:
   push:
-    branches:
-      - fb-release
+    tags:
+    - '*'
 
 env:
   ACTIONS_ALLOW_UNSECURE_COMMANDS: true
@@ -13,7 +13,7 @@ env:
   GKE_ZONE: europe-north1-a
 
 jobs:
-  setup-build-publish:
+  setup-release-publish:
     name: Setup, Build, Publish
     runs-on: ubuntu-latest
 
@@ -33,18 +33,18 @@ jobs:
       run: |-
         #Pull the image to save the build time
         docker build \
-          --tag "$IMAGE":"$GITHUB_SHA" \
+          --tag "$IMAGE":"${GITHUB_REF##*/}" \
           .
 
     # Push the Docker image to Google Container Registry
     - name: Publish
       run: |-
-        docker push "$IMAGE":"$GITHUB_SHA"
+        docker push "$IMAGE":"${GITHUB_REF##*/}"
 
   deploy:
     name: Deploy
     runs-on: ubuntu-latest
-    needs: setup-build-publish
+    needs: setup-release-publish
 
     steps:
     - name: Checkout
@@ -69,7 +69,7 @@ jobs:
     # Deploy the Docker image to the GKE cluster
     - name: Deploy
       run: |-
-        ./kustomize edit set image "$IMAGE":"$GITHUB_SHA"
+        ./kustomize edit set image "$IMAGE":"${GITHUB_REF##*/}"
         ./kustomize build . |
         kubectl apply -f -
 
